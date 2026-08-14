@@ -1,0 +1,22 @@
+import { Controller, Post, Body, Req, Param, Get, UsePipes, ValidationPipe } from '@nestjs/common';
+import { StaffService } from './staff.service';
+import { CreateStaffDto } from '../dto/create-staff.dto';
+
+@Controller('salons/:salonId/staff')
+export class StaffController {
+  constructor(private readonly staffService: StaffService) {}
+
+  @Post()
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async create(@Req() req: any, @Param('salonId') salonId: string, @Body() body: CreateStaffDto) {
+    if (!req.user) return { ok: false, message: 'Unauthorized' };
+    // check ownership
+    if (req.user.sub !== body.ownerId && !req.user.roles?.includes('ADMIN')) return { ok: false, message: 'Forbidden' };
+    return this.staffService.create(salonId, body);
+  }
+
+  @Get()
+  async list(@Param('salonId') salonId: string) {
+    return this.staffService.list(salonId);
+  }
+}

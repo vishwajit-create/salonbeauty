@@ -1,0 +1,33 @@
+import { Controller, Patch, Param, Req, Get, UseGuards } from '@nestjs/common';
+import { SalonsService } from '../salons/salons.service';
+import { Roles } from '../common/roles.decorator';
+import { RolesGuard } from '../common/roles.guard';
+
+@Controller('admin/salons')
+@UseGuards(RolesGuard)
+export class AdminSalonsController {
+  constructor(private readonly salonsService: SalonsService) {}
+
+  @Get('pending')
+  @Roles('ADMIN')
+  async pending(@Req() req: any) {
+    const items = await this.salonsService.listPending();
+    return { ok: true, items };
+  }
+
+  @Patch(':id/approve')
+  @Roles('ADMIN')
+  async approve(@Req() req: any, @Param('id') id: string) {
+    const updated = await this.salonsService.setStatus(id, 'APPROVED');
+    if (!updated) return { ok: false, message: 'Not found' };
+    return { ok: true, salon: updated };
+  }
+
+  @Patch(':id/reject')
+  @Roles('ADMIN')
+  async reject(@Req() req: any, @Param('id') id: string) {
+    const updated = await this.salonsService.setStatus(id, 'REJECTED');
+    if (!updated) return { ok: false, message: 'Not found' };
+    return { ok: true, salon: updated };
+  }
+}

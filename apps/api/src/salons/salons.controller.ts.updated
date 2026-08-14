@@ -1,0 +1,52 @@
+import { Controller, Post, UseInterceptors, UploadedFile, Req, Param, Get, Body, Query, UsePipes, ValidationPipe } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { SalonsService } from './salons.service';
+import { UploadService } from '../upload/upload.service';
+import { CreateSalonDto } from '../dto/create-salon.dto';
+
+const ALLOWED_MIME = ['image/jpeg', 'image/png'];
+
+@Controller('salons')
+export class SalonsController {
+  constructor(private readonly salonsService: SalonsService, private readonly uploadService: UploadService) {}
+
+  @Post()
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async create(@Req() req: any, @Body() body: CreateSalonDto) {
+    if (!req.user) return { ok: false, message: 'Unauthorized' };
+    const ownerId = req.user.sub;
+    return this.salonsService.create({ ...body, ownerId });
+  }
+
+  @Get()
+  async list(@Query('city') city: string) {
+    return this.salonsService.list(city);
+  }
+
+  @Get(':id')
+  async get(@Param('id') id: string) {
+    return this.salonsService.getById(id);
+  }
+
+  @Post(':id/photos')
+  @UseInterceptors(FileInterceptor('photo', {
+    storage: memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      if (!ALLOWED_MIME.includes(file.mimetype)) return cb(new Error('Invalid file type'), false);
+      cb(null, true);
+    }
+  }))
+  async uploadPhoto(@Req() req: any, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+    if (!req.user) return { ok: false, message: 'Unauthorized' };
+    const salon = await this.salonsService.getByIdInternal(id);
+    if (!salon) return { ok: false, message: 'Salon not found' };
+    const roles = req.user.roles || [];
+    if (salon.owner.id !== req.user.sub && !roles.includes('ADMIN')) return { ok: false, message: 'Forbidden' };
+    if (!file) return { ok: false, message: 'No file uploaded or invalid file type/size' };
+    const url = await this.uploadService.upload(id, file);
+    await this.salonsService.addPhoto(id, url);
+    return { ok: true, url };
+  }
+}
