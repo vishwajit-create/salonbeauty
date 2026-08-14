@@ -1,8 +1,11 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { Injectable } from '@nestjs/common';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import * as path from 'path';
 import * as fs from 'fs';
 
+@Injectable()
 export class UploadService {
   private driver = process.env.UPLOAD_DRIVER || 'local';
   private s3Client: S3Client | null = null;
@@ -27,20 +30,44 @@ export class UploadService {
     if (!this.s3Client) throw new Error('S3 client not configured');
     if (!this.bucket) throw new Error('S3_BUCKET not configured');
     const key = `salons/${salonId}/${Date.now()}${path.extname(file.originalname)}`;
-    const cmd = new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: file.buffer, ContentType: file.mimetype });
+    // Upload as private
+    const cmd = new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: file.buffer, ContentType: file.mimetype, ACL: 'private' });
     await this.s3Client.send(cmd);
-    const region = process.env.S3_REGION;
-    return `https://${this.bucket}.s3.${region}.amazonaws.com/${key}`;
+    return key; // store key in DB; presigned GET will be used to access
   }
 
-  async getPresignedUrl(salonId: string, filename: string, contentType: string) {
+  async getPresignedPutUrl(salonId: string, filename: string, contentType: string) {
     if (this.driver !== 's3') throw new Error('Presign only available for S3 driver');
     if (!this.s3Client) throw new Error('S3 client not configured');
     if (!this.bucket) throw new Error('S3_BUCKET not configured');
     const key = `salons/${salonId}/${Date.now()}-${filename}`;
-    const cmd = new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType });
+    const cmd = new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType, ACL: 'private' });
     const url = await getSignedUrl(this.s3Client, cmd, { expiresIn: 300 });
-    return { url, key: `https://${this.bucket}.s3.${process.env.S3_REGION}.amazonaws.com/${key}` };
+    return { url, key };
+  }
+
+  async getPresignedPost(salonId: string, filename: string, contentType: string) {
+    if (this.driver !== 's3') throw new Error('Presign POST only available for S3 driver');
+    if (!this.s3Client) throw new Error('S3 client not configured');
+    if (!this.bucket) throw new Error('S3_BUCKET not configured');
+    const key = `salons/${salonId}/${Date.now()}-${filename}`;
+    const presigned = await createPresignedPost(this.s3Client, {
+      Bucket: this.bucket,
+      Key: key,
+      Conditions: [['content-length-range', 1, 5 * 1024 * 1024]],
+      Fields: { 'Content-Type': contentType },
+      Expires: 300,
+    });
+    return { presigned, key };
+  }
+
+  async getPresignedGet(key: string) {
+    if (this.driver !== 's3') throw new Error('Presign GET only available for S3 driver');
+    if (!this.s3Client) throw new Error('S3 client not configured');
+    if (!this.bucket) throw new Error('S3_BUCKET not configured');
+    const cmd = new GetObjectCommand({ Bucket: this.bucket, Key: key });
+    const url = await getSignedUrl(this.s3Client, cmd, { expiresIn: 60 });
+    return url;
   }
 
   async upload(salonId: string, file: Express.Multer.File) {

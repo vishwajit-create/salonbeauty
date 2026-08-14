@@ -1,21 +1,10 @@
-import { Controller, Post, Body, BadRequestException } from '@nestjs/common';
-import { AppDataSource } from '../data-source';
-import { Role } from '../entities/role.entity';
+// Disable dev promote endpoint by replacing implementation
+import { Controller, Post } from '@nestjs/common';
 
 @Controller('dev')
 export class DevController {
   @Post('promote')
-  async promote(@Body() body: { mobile: string; role: string }) {
-    if (process.env.NODE_ENV === 'production') throw new BadRequestException('Not allowed in production');
-    const { mobile, role } = body;
-    if (!mobile || !role) throw new BadRequestException('mobile and role are required');
-    const userRepo = AppDataSource.getRepository('users');
-    const roleRepo = AppDataSource.getRepository(Role);
-    const user = await userRepo.findOne({ where: { mobile } as any });
-    if (!user) return { ok: false, message: 'User not found' };
-    const r = await roleRepo.findOne({ where: { name: role } as any });
-    if (!r) return { ok: false, message: 'Role not found' };
-    await AppDataSource.createQueryBuilder().insert().into('user_roles').values({ userId: user.id, roleId: r.id }).orIgnore().execute();
-    return { ok: true };
+  async promote() {
+    return { ok: false, message: 'Dev promote disabled. Use admin UI to manage roles.' };
   }
 }
