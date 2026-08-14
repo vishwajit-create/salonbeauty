@@ -1,0 +1,7 @@
+{"patch":"*** Begin Patch
+*** Update File: apps/api/src/app.module.ts
+@@
+-import { AuthModule } from './auth/auth.module';
++import { AuthModule } from './auth/auth.module';
++import { AuthV2Module } from './auth/auth.v2.module';
+*** End Patch"}

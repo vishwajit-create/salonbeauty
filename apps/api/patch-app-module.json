@@ -1,0 +1,11 @@
+{"patch":"*** Begin Patch
+*** Update File: apps/api/src/app.module.ts
+@@
+-    AuthModule,
+-    UsersModule,
+-    SalonsModule,
++    AuthModule,
++    AuthV2Module,
++    UsersModule,
++    SalonsModule,
+*** End Patch"}
