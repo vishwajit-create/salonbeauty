@@ -1,0 +1,26 @@
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
+import { User } from './user.entity';
+import { Salon } from './salon.entity';
+
+@Entity({ name: 'audit_logs' })
+export class AuditLog {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  action: string;
+
+  @Column({ type: 'json', nullable: true })
+  details: any;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'performed_by' })
+  performedBy: User;
+
+  @ManyToOne(() => Salon, { nullable: true })
+  @JoinColumn({ name: 'salon_id' })
+  salon: Salon;
+
+  @CreateDateColumn({ type: 'timestamp' })
+  created_at: Date;
+}

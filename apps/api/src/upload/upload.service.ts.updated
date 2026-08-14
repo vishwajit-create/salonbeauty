@@ -1,0 +1,50 @@
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import * as path from 'path';
+import * as fs from 'fs';
+
+export class UploadService {
+  private driver = process.env.UPLOAD_DRIVER || 'local';
+  private s3Client: S3Client | null = null;
+  private bucket = process.env.S3_BUCKET;
+
+  constructor() {
+    if (this.driver === 's3') {
+      this.s3Client = new S3Client({ region: process.env.S3_REGION });
+    }
+  }
+
+  async uploadLocal(salonId: string, file: Express.Multer.File) {
+    const uploadDir = path.join(process.cwd(), 'uploads', 'salons', salonId);
+    fs.mkdirSync(uploadDir, { recursive: true });
+    const filename = `${Date.now()}${path.extname(file.originalname)}`;
+    const dest = path.join(uploadDir, filename);
+    fs.writeFileSync(dest, file.buffer);
+    return `/uploads/salons/${salonId}/${filename}`;
+  }
+
+  async uploadS3(salonId: string, file: Express.Multer.File) {
+    if (!this.s3Client) throw new Error('S3 client not configured');
+    if (!this.bucket) throw new Error('S3_BUCKET not configured');
+    const key = `salons/${salonId}/${Date.now()}${path.extname(file.originalname)}`;
+    const cmd = new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: file.buffer, ContentType: file.mimetype });
+    await this.s3Client.send(cmd);
+    const region = process.env.S3_REGION;
+    return `https://${this.bucket}.s3.${region}.amazonaws.com/${key}`;
+  }
+
+  async getPresignedUrl(salonId: string, filename: string, contentType: string) {
+    if (this.driver !== 's3') throw new Error('Presign only available for S3 driver');
+    if (!this.s3Client) throw new Error('S3 client not configured');
+    if (!this.bucket) throw new Error('S3_BUCKET not configured');
+    const key = `salons/${salonId}/${Date.now()}-${filename}`;
+    const cmd = new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType });
+    const url = await getSignedUrl(this.s3Client, cmd, { expiresIn: 300 });
+    return { url, key: `https://${this.bucket}.s3.${process.env.S3_REGION}.amazonaws.com/${key}` };
+  }
+
+  async upload(salonId: string, file: Express.Multer.File) {
+    if (this.driver === 's3') return this.uploadS3(salonId, file);
+    return this.uploadLocal(salonId, file);
+  }
+}
