@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Admin - Salon Approvals</title>
+</head>
+<body>
+  <h1>Pending Salons</h1>
+  <div id="list"></div>
+
+  <script>
+    async function fetchPending() {
+      const token = prompt('Enter ADMIN access token');
+      if (!token) return;
+      const res = await fetch('/admin/salons/pending', { headers: { Authorization: 'Bearer ' + token } });
+      const data = await res.json();
+      const container = document.getElementById('list');
+      if (!data.ok) { container.innerText = 'Error: ' + data.message; return; }
+      container.innerHTML = '';
+      data.items.forEach(s => {
+        const el = document.createElement('div');
+        el.innerHTML = `<h3>${s.name} (${s.id})</h3><p>${s.description || ''}</p><button onclick="approve('${s.id}')">Approve</button> <button onclick="reject('${s.id}')">Reject</button><hr/>`;
+        container.appendChild(el);
+      });
+    }
+
+    async function approve(id) {
+      const token = prompt('Enter ADMIN access token');
+      await fetch('/admin/salons/' + id + '/approve', { method: 'PATCH', headers: { Authorization: 'Bearer ' + token } });
+      fetchPending();
+    }
+
+    async function reject(id) {
+      const token = prompt('Enter ADMIN access token');
+      await fetch('/admin/salons/' + id + '/reject', { method: 'PATCH', headers: { Authorization: 'Bearer ' + token } });
+      fetchPending();
+    }
+
+    fetchPending();
+  </script>
+</body>
+</html>

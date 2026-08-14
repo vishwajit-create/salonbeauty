@@ -1,0 +1,10 @@
+// Disable dev promote endpoint by replacing implementation
+import { Controller, Post } from '@nestjs/common';
+
+@Controller('dev')
+export class DevController {
+  @Post('promote')
+  async promote() {
+    return { ok: false, message: 'Dev promote disabled. Use admin UI to manage roles.' };
+  }
+}

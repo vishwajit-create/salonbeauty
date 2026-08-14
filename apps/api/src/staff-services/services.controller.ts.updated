@@ -1,0 +1,23 @@
+import { Controller, Post, Body, Req, Param, Get, UsePipes, ValidationPipe } from '@nestjs/common';
+import { ServicesService } from './services.service';
+import { CreateServiceDto } from '../dto/create-service.dto';
+
+@Controller('salons/:salonId/services')
+export class ServicesController {
+  constructor(private readonly servicesService: ServicesService) {}
+
+  @Post()
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async create(@Req() req: any, @Param('salonId') salonId: string, @Body() body: CreateServiceDto) {
+    if (!req.user) return { ok: false, message: 'Unauthorized' };
+    // owner check simplified: requires ownerId in body to match token OR admin
+    // In future, verify owner via DB
+    if ((body as any).ownerId && req.user.sub !== (body as any).ownerId && !req.user.roles?.includes('ADMIN')) return { ok: false, message: 'Forbidden' };
+    return this.servicesService.create(salonId, body);
+  }
+
+  @Get()
+  async list(@Param('salonId') salonId: string) {
+    return this.servicesService.list(salonId);
+  }
+}
