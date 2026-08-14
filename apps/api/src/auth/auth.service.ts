@@ -35,8 +35,10 @@ export class AuthService {
     if (!user) {
       user = await this.usersService.create({ mobile });
     }
-    // generate tokens
-    const access = jwt.sign({ sub: user.id, mobile: user.mobile }, process.env.JWT_SECRET || 'dev_jwt_secret_change_me', { expiresIn: '1h' });
+    // ensure roles are loaded
+    const roles = (user.roles || []).map((r: any) => r.name);
+    // generate tokens with roles in payload
+    const access = jwt.sign({ sub: user.id, mobile: user.mobile, roles }, process.env.JWT_SECRET || 'dev_jwt_secret_change_me', { expiresIn: '1h' });
     const refresh = jwt.sign({ sub: user.id }, process.env.JWT_REFRESH_SECRET || 'dev_jwt_refresh_secret', { expiresIn: '7d' });
     await this.redis.del(key);
     return { success: true, access, refresh };
